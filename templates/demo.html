@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+{% load static from staticfiles %}
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Upload</title>
+</head>
+<body>
+<h1>Django multiple file chunked upload</h1>
+<a href="https://github.com/tcztzy/django-multiple-file-chunked-upload">this</a>
+<form>
+    <input id="dataset_name" type="text" title="dataset_name" placeholder="Enter the data set name.">
+    <input id="fileupload" type="file" name="files" multiple="multiple">
+    <button id="submit" type="button">Start Upload</button>
+</form>
+<script src="{% static 'js/jquery-2.2.0.min.js' %}"></script>
+<script src="{% static 'js/jquery.ui.widget.js' %}"></script>
+<script src="{% static 'js/jquery.fileupload.js' %}"></script>
+<script src="{% static 'js/spark-md5.min.js' %}"></script>
+<script>
+    function getCookie(name) {
+        var cookieValue = null;
+        if (document.cookie && document.cookie != '') {
+            var cookies = document.cookie.split(';');
+            for (var i = 0; i < cookies.length; i++) {
+                var cookie = jQuery.trim(cookies[i]);
+                // Does this cookie string begin with the name we want?
+                if (cookie.substring(0, name.length + 1) == (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+    var csrftoken = getCookie('csrftoken');
+    function csrfSafeMethod(method) {
+        // these HTTP methods do not require CSRF protection
+        return (/^(GET|HEAD|OPTIONS|TRACE)$/.test(method));
+    }
+    $.ajaxSetup({
+        beforeSend: function(xhr, settings) {
+            if (!csrfSafeMethod(settings.type) && !this.crossDomain) {
+                xhr.setRequestHeader("X-CSRFToken", csrftoken);
+            }
+        }
+    });
+</script>
+<script>
+    function calculate_md5(file){
+        var blobSlice = File.prototype.slice || File.prototype.mozSlice || File.prototype.webkitSlice,
+            chunkSize = 2097152,                             // Read in chunks of 2MB
+            chunks = Math.ceil(file.size / chunkSize),
+            currentChunk = 0,
+            spark = new SparkMD5.ArrayBuffer(),
+            fileReader = new FileReader();
+        fileReader.onload = function (e) {
+            spark.append(e.target.result);                   // Append array buffer
+            currentChunk++;
+            if (currentChunk < chunks) {
+                loadNext();
+            } else {
+                console.log('finished loading');
+                $.ajax('/upload/md5/',{
+                    type: 'POST',
+                    url: '/upload/md5/',
+                    data: {
+                        file_name: file.name,
+                        total_size: file.size,
+                        md5: spark.end(),
+                        dataset_name: $("#dataset_name").val()
+                    }
+                })
+            }
+        };
+
+        fileReader.onerror = function () {
+            console.warn('oops, something went wrong.');
+        };
+
+        function loadNext() {
+            var start = currentChunk * chunkSize,
+                end = ((start + chunkSize) >= file.size) ? file.size : start + chunkSize;
+
+            fileReader.readAsArrayBuffer(blobSlice.call(file, start, end));
+        }
+
+        loadNext();
+    }
+</script>
+<script>
+    var form_data = [{"name": "dataset_name", "value": $("#dataset_name").val()}];
+    $("#fileupload")
+            .bind('fileuploadadd', function (e, data) {
+                $.each(data.files, function (index, file) {
+                    console.log('calculate md5 of '+file.name);
+                    calculate_md5(file);
+                });
+                $("#submit").click(data.submit());
+            })
+            .bind('fileuploadsubmit', function (e, data) {
+                console.log('submit: '+data.files[0].name)
+            })
+            .bind('fileuploadsend', function (e, data) {
+                console.log('send  : '+data.files[0].name)
+            })
+            .bind('fileuploaddone', function (e, data) {
+                console.log('done  : '+data.files[0].name+'; '+data.result['content_range']);
+                $.ajax({
+                    type: 'POST',
+                    url: '/upload/'
+                })
+            })
+            .bind('fileuploadfail', function (e, data) {/* ... */})
+            .bind('fileuploadalways', function (e, data) {/* ... */})
+            .bind('fileuploadprogress', function (e, data) {/* ... */})
+            .bind('fileuploadprogressall', function (e, data) {/* ... */})
+            .bind('fileuploadstart', function (e) {/* ... */})
+            .bind('fileuploadstop', function (e) {/* ... */})
+            .bind('fileuploadchange', function (e, data) {/* ... */})
+            .bind('fileuploadpaste', function (e, data) {/* ... */})
+            .bind('fileuploaddrop', function (e, data) {/* ... */})
+            .bind('fileuploaddragover', function (e) {/* ... */})
+            .bind('fileuploadchunksend', function (e, data) {
+                console.log('c_send: '+data.files[0].name)
+            })
+            .bind('fileuploadchunkdone', function (e, data) {
+                console.log('c_done: '+data.files[0].name+'; '+data.result['content_range'])
+            })
+            .bind('fileuploadchunkfail', function (e, data) {/* ... */})
+            .bind('fileuploadchunkalways', function (e, data) {/* ... */})
+            .fileupload({
+                url: "/upload/chunk/",
+                maxChunkSize: 2097152, // 2 MB
+                formData: form_data,
+                autoUpload: false
+            });
+</script>
+</body>
+</html>
