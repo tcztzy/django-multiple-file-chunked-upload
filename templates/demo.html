@@ -47,9 +47,8 @@
     });
 </script>
 <script>
-    function calculate_md5(file){
+    function calculate_md5(file, chunkSize){
         var blobSlice = File.prototype.slice || File.prototype.mozSlice || File.prototype.webkitSlice,
-            chunkSize = 2097152,                             // Read in chunks of 2MB
             chunks = Math.ceil(file.size / chunkSize),
             currentChunk = 0,
             spark = new SparkMD5.ArrayBuffer(),
@@ -61,7 +60,7 @@
                 loadNext();
             } else {
                 console.log('finished loading');
-                $.ajax('/upload/md5/',{
+                $.ajax({
                     type: 'POST',
                     url: '/upload/md5/',
                     data: {
@@ -69,6 +68,12 @@
                         total_size: file.size,
                         md5: spark.end(),
                         dataset_name: $("#dataset_name").val()
+                    },
+                    success: function(data) {
+                            console.log('success');
+                        },
+                    error:function(){
+                            console.log('error');
                     }
                 })
             }
@@ -89,14 +94,19 @@
     }
 </script>
 <script>
-    var form_data = [{"name": "dataset_name", "value": $("#dataset_name").val()}];
+    var form_data = [];
     $("#fileupload")
             .bind('fileuploadadd', function (e, data) {
+                if (form_data.length == 0){
+                    form_data.push(
+                        {"name": "dataset_name", "value": $("#dataset_name").val()}
+                    )
+                }
                 $.each(data.files, function (index, file) {
                     console.log('calculate md5 of '+file.name);
-                    calculate_md5(file);
+                    calculate_md5(file, 1000000); // 1 MB
                 });
-                $("#submit").click(data.submit());
+                $("#submit").click(function () {data.submit()});
             })
             .bind('fileuploadsubmit', function (e, data) {
                 console.log('submit: '+data.files[0].name)
@@ -105,36 +115,40 @@
                 console.log('send  : '+data.files[0].name)
             })
             .bind('fileuploaddone', function (e, data) {
-                console.log('done  : '+data.files[0].name+'; '+data.result['content_range']);
-                $.ajax({
-                    type: 'POST',
-                    url: '/upload/'
-                })
-            })
-            .bind('fileuploadfail', function (e, data) {/* ... */})
-            .bind('fileuploadalways', function (e, data) {/* ... */})
-            .bind('fileuploadprogress', function (e, data) {/* ... */})
-            .bind('fileuploadprogressall', function (e, data) {/* ... */})
-            .bind('fileuploadstart', function (e) {/* ... */})
-            .bind('fileuploadstop', function (e) {/* ... */})
-            .bind('fileuploadchange', function (e, data) {/* ... */})
-            .bind('fileuploadpaste', function (e, data) {/* ... */})
-            .bind('fileuploaddrop', function (e, data) {/* ... */})
-            .bind('fileuploaddragover', function (e) {/* ... */})
-            .bind('fileuploadchunksend', function (e, data) {
-                console.log('c_send: '+data.files[0].name)
-            })
-            .bind('fileuploadchunkdone', function (e, data) {
-                console.log('c_done: '+data.files[0].name+'; '+data.result['content_range'])
-            })
-            .bind('fileuploadchunkfail', function (e, data) {/* ... */})
-            .bind('fileuploadchunkalways', function (e, data) {/* ... */})
+                var thisFile = data.files[0];
+                    console.log(thisFile.name+' done');
+                    $.ajax({
+                        type: "POST",
+                        url: "/upload/complete/",
+                        data: {
+                            file_name: thisFile.name,
+                            total_size: thisFile.size,
+                            dataset_name: $("#Data_name").val()
+                        },
+                        statusCode: {
+                            204: function () {
+                                console.log('Successfully upload.')
+                            }
+                        },
+                        success: function() {
+                            console.log('success check the uploaded file\'s md5');
+                        },
+                        error:function(){
+                            console.log('error');
+                        }
+            })})
             .fileupload({
                 url: "/upload/chunk/",
-                maxChunkSize: 2097152, // 2 MB
+                maxChunkSize: 1000000, // 1 MB
                 formData: form_data,
                 autoUpload: false
-            });
+            })
+            .on('fileuploadchunksend', function (e, data) {
+                console.log('c_send: '+data.files[0].name)
+            })
+            .on('fileuploadchunkdone', function (e, data) {
+                console.log('c_done: '+data.files[0].name+'; '+data.result['content_range'])
+            })
 </script>
 </body>
 </html>

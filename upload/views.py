@@ -75,7 +75,7 @@ class UploadView(UploadBaseView):
     def _post(self, request):
         chunk = request.FILES.get(self.field_name)
         start, end, total = self.get_content_range(request, chunk)
-        dataset = self.get_or_create_dataset(request.POST.get('name'))
+        dataset = self.get_or_create_dataset(request.POST.get('dataset_name'))
         chunked_upload = self.get_or_create_chunked_upload(chunk, total, dataset)
         if chunked_upload.is_finished:
             pass
@@ -97,8 +97,8 @@ class UploadView(UploadBaseView):
 
 class UploadCompleteView(UploadBaseView):
     def _post(self, request):
-        filename = request.POST.get('filename')
-        size = request.POST.get('size')
+        filename = request.POST.get('file_name')
+        size = request.POST.get('total_size')
         dataset_name = request.POST.get('dataset_name')
         dataset = DataSet.objects.get(name=dataset_name)
         chunked_upload = self.model.objects.get(file_name=filename, total_size=size, dataset=dataset)
@@ -127,7 +127,8 @@ class Md5View(UploadBaseView):
         total_size = request.POST.get('total_size')
         md5 = request.POST.get('md5')
         dataset_name = request.POST.get('dataset_name')
-        if not all((file_name, total_size, md5, dataset_name)):
+        print(file_name, total_size, md5, dataset_name)
+        if all((file_name, total_size, md5, dataset_name)):
             dataset = self.get_or_create_dataset(name=dataset_name)
             chunk = ContentFile(name=file_name, content='')
             chunked_upload = self.get_or_create_chunked_upload(chunk, int(total_size), dataset)
