@@ -103,7 +103,7 @@ class UploadCompleteView(UploadBaseView):
         dataset = DataSet.objects.get(name=dataset_name)
         chunked_upload = self.model.objects.get(file_name=filename, total_size=size, dataset=dataset)
         if chunked_upload.is_finished:
-            if all(map(lambda cu: cu.is_finished, dataset.chunkedupload_set.all())):
+            if all(map(lambda cu: cu.is_finished, dataset.uploadfile_set.all())):
                 return UploadResponse({'status': 'success'}, status=204)
             return UploadResponse({'status': 'success'}, status=200)
         else:
