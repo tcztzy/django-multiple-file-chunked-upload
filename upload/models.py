@@ -10,7 +10,6 @@ class UploadFileBase(models.Model):
     total_size = models.BigIntegerField(default=0)
     recorded_md5 = models.CharField(max_length=32, blank=True)
 
-
     @property
     def current_size(self):
         return self.file.size
@@ -28,6 +27,7 @@ class UploadFileBase(models.Model):
 
     class Meta:
         abstract = True
+        unique_together = (('file_name', 'total_size'),)
 
     def __str__(self):
         return 'name: {file_name}; size: {total_size}; md5: {recorded_md5}'.format(
@@ -64,5 +64,8 @@ def generate_file_path(instance, filename):
 
 class UploadFile(UploadFileBase):
     dataset = models.ForeignKey(DataSet)
+
+    class Meta:
+        unique_together = (('dataset', 'recorded_md5'), ('dataset', 'file_name', 'total_size'))
 
 UploadFile._meta.get_field('file').upload_to = generate_file_path
